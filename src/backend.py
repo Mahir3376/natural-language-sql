@@ -72,15 +72,15 @@ def get_tables(_engine, database_name):
 
 @st.cache_data
 def get_table_info(_engine, database_name, table_name):
-    """Get column information for a table."""
+    """Get column information for a table (safe, parameterized)."""
     try:
-        query = f"""
-        SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT, CHARACTER_MAXIMUM_LENGTH
-        FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = '{database_name}' AND TABLE_NAME = '{table_name}'
-        ORDER BY ORDINAL_POSITION
-        """
-        return pd.read_sql(query, _engine)
+        query = text("""
+            SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT, CHARACTER_MAXIMUM_LENGTH
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = :db AND TABLE_NAME = :tbl
+            ORDER BY ORDINAL_POSITION
+        """)
+        return pd.read_sql(query, _engine, params={"db": database_name, "tbl": table_name})
     except Exception as e:
         st.error(f"Error getting table info: {str(e)}")
         return pd.DataFrame()
@@ -88,9 +88,12 @@ def get_table_info(_engine, database_name, table_name):
 
 @st.cache_data
 def get_row_count(_engine, database_name, table_name):
-    """Count rows in a table."""
+    """Count rows in a table (safe, parameterized)."""
     try:
-        query = f"SELECT COUNT(*) as row_count FROM `{database_name}`.`{table_name}`"
+        query = text("SELECT COUNT(*) as row_count FROM `{db}`.`{tbl}`".format(
+            db=database_name.replace("`", ""),  # sanitize
+            tbl=table_name.replace("`", "")
+        ))
         result = pd.read_sql(query, _engine)
         return result['row_count'].iloc[0]
     except Exception as e:
