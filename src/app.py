@@ -210,10 +210,16 @@ if "server_engine" in st.session_state:
                     st.subheader("Ask in Natural Language")
                     question = st.text_input("Enter your question")
                     if st.button("Ask"):
-                        sql_query = handle_nl_query(question, "GROQ", "llm")
-                        st.code(sql_query, language="sql")
-                        results = execute_query(db_engine, sql_query)
-                        st.dataframe(results)
+                        sql_query = handle_nl_query(question, "GROQ", mode="regex")
+                        if not sql_query:
+                            sql_query = handle_nl_query(question, "GROQ", mode="llm")
+                        
+                        if sql_query:
+                            st.code(sql_query, language="sql")
+                            results = execute_query(db_engine, sql_query)
+                            st.dataframe(results)
+                        else:
+                            st.warning("I couldn’t generate a valid SQL query for that question.")
 
     else:
         st.warning("No databases found on this server.")
