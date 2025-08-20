@@ -14,11 +14,10 @@ SCHEMA SUMMARY:
 -----------------
 IMPORTANT CONTEXT:
 - Always generate queries in **MySQL dialect**.  
-- Use backticks `` ` `` for identifiers (tables, columns) if needed.  
+- Use backticks `` ` `` for identifiers (tables, columns).  
 - Use `LIMIT` instead of `TOP`.  
 - Assume queries will run directly against the database described in the schema.  
 - If the user asks a vague question (e.g., “show users”), map it to the closest matching table/column.  
-- Only return SQL. Explanations, reasoning, or formatting must be in SQL comments (`-- ...`).  
 - Hotels are identified by `Hotel_id`.  
 - A hotel can offer many services via the `Offers` table (many-to-many).  
 - Each hotel has multiple rooms (see `Room`).  
@@ -62,7 +61,7 @@ LIMIT 20;
 
 -----------------
 Only return the SQL query.
-Do not add explanations, formatting, or comments.
+Do not add explanations or comments.
 
 -----------------
 USER QUESTION:
