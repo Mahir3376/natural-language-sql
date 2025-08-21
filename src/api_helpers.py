@@ -5,54 +5,39 @@ from langchain.schema import HumanMessage
 import streamlit as st
 
 from prompt import PROMPT
-from regex import resolve_query_regex
 
 load_dotenv()
 
 
-# --------------------------
 # LLM setup
-# --------------------------
-def get_response(input, provider="GROQ"):
-    match provider:
-        case "GROQ":
-            llm = ChatGroq(
-                api_key=os.getenv("GROQ_API_KEY"),
-                model_name="llama3-8b-8192"
-            )
-            return llm.invoke(input)
-        case _:
-            st.error("Error: Unknown API Provider")
-            return None
+def get_response(input_messages, provider="GROQ"):
+    if provider == "GROQ":
+        llm = ChatGroq(
+            api_key=os.getenv("GROQ_API_KEY"),
+            model_name="llama3-8b-8192"
+        )
+        return llm.invoke(input_messages)
+    else:
+        st.error(f"Unknown API provider: {provider}")
+        return None
 
 
-# --------------------------
 # Helpers
-# --------------------------
 def compress_text(text: str, max_lines: int = 500) -> str:
     lines = text.strip().splitlines()
     return "\n".join(lines[:max_lines]) + ("\n#...truncated" if len(lines) > max_lines else "")
 
-# --------------------------
-# Sanitize SQL (T-SQL → MySQL)
-# --------------------------
-# def fix_tsql_to_mysql(sql: str) -> str:
-#     if not sql:
-#         return sql
-#     sql = sql.replace("[", "`").replace("]", "`")  # Brackets → backticks
-#     sql = sql.replace("TOP 1000", "LIMIT 1000")
-#     sql = sql.replace("TOP (1000)", "LIMIT 1000")
-#     return sql.strip()
+@st.cache_data
+def load_schema(path="context/schema.sql") -> str:
+    with open(path) as f:
+        return f.read()
 
-# --------------------------
 # SQL Generation (NL → SQL)
-# --------------------------
 def generate_sql_from_nl(nl_question: str, provider: str = "GROQ") -> str:
     try:
-        with open("context/schema.sql") as f:
-            schema_context = f.read()
+        schema_context = load_schema()
     except FileNotFoundError:
-        st.error("❌ schema.sql not found in /context directory")
+        st.error("schema.sql not found in /context directory")
         return ""
 
     prompt = PROMPT.format(
@@ -61,30 +46,23 @@ def generate_sql_from_nl(nl_question: str, provider: str = "GROQ") -> str:
     )
 
     response = get_response([HumanMessage(content=prompt)], provider=provider)
-    output = response.content.strip(" `-")
+    if response and hasattr(response, "content"):
+        return response.content.strip(" `-")
+    return ""
 
-    return output   # ensure MySQL-compatible output
 
-# --------------------------
-# Handle NL Query (Regex or LLM)
-# --------------------------
-def handle_nl_query(nl_question: str, provider: str, mode: str = "llm") -> str:
-    if mode == "regex":
-        return resolve_query_regex(nl_question).strip()
-    elif mode == "llm":
-        return generate_sql_from_nl(nl_question, provider=provider)
-    else:
-        st.error("❌ Unknown query mode")
+# To handle NL Query
+def handle_nl_query(nl_question: str, source: str = "GROQ") -> str:
+    if source not in ["GROQ", "OpenAI"]:
+        st.error(f"Unknown provider: {source}")
         return ""
+    sql_query = generate_sql_from_nl(nl_question, provider=source)
+    return sql_query.strip() if sql_query else ""
 
-
-# --------------------------
 # Format results to NL
-# --------------------------
-def format_result_to_nl(question: str, result):
+def format_result_to_nl(question: str, result) -> str:
     if result.empty:
-        return "🔍 I couldn't find any relevant data."
+        return "I couldn't find any relevant data."
 
     value = result.values
-    value = value.item() if value.size == 1 else value.tolist()
-    return str(value)
+    return str(value.item() if value.size == 1 else value.tolist())

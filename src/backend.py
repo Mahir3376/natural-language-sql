@@ -3,9 +3,7 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 import urllib.parse
 
-# --------------------------
 # MySQL CONNECTION FUNCTIONS
-# --------------------------
 
 @st.cache_resource
 def get_server_connection(host, port, username, password):
@@ -41,9 +39,7 @@ def get_database_connection(host, port, username, password, database_name):
         return None
 
 
-# --------------------------
 # METADATA FUNCTIONS
-# --------------------------
 
 @st.cache_data
 def get_databases(_engine):
@@ -91,7 +87,7 @@ def get_row_count(_engine, database_name, table_name):
     """Count rows in a table (safe, parameterized)."""
     try:
         query = text("SELECT COUNT(*) as row_count FROM `{db}`.`{tbl}`".format(
-            db=database_name.replace("`", ""),  # sanitize
+            db=database_name.replace("`", ""),
             tbl=table_name.replace("`", "")
         ))
         result = pd.read_sql(query, _engine)
@@ -101,9 +97,7 @@ def get_row_count(_engine, database_name, table_name):
         return "Error"
 
 
-# --------------------------
 # QUERY EXECUTION
-# --------------------------
 
 @st.cache_data
 def execute_query(_engine, query, limit=1000):

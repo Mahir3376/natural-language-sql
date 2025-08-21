@@ -144,6 +144,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# Original DB
+context/full_data.sql
+
 # Spyder project settings
 .spyderproject
 .spyproject

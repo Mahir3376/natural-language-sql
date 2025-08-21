@@ -21,9 +21,7 @@ from api_helpers import (
     handle_nl_query
 )
 
-# --------------------------
 # Logging setup
-# --------------------------
 logging.basicConfig(
     level=logging.DEBUG,  
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -31,19 +29,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# --------------------------
 # Page config
-# --------------------------
 st.set_page_config(
     page_title="Database Query Explorer",
     layout="wide"
 )
 
-st.title("🗄️ Database Query Explorer (MySQL)")
+st.title("Database Query Explorer (MySQL)")
 
-# --------------------------
 # Login & connection
-# --------------------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
@@ -51,9 +45,9 @@ if not st.session_state.logged_in:
     st.subheader("Connect to your MySQL server")
 
     with st.form("login_form"):
-        host = st.text_input("Host", "localhost")
+        host = st.text_input("Host", "127.0.0.1")
         port = st.number_input("Port", value=3306, min_value=1, max_value=65535)
-        username = st.text_input("Username", "root")
+        username = st.text_input("Username", "NLQ_User")
         password = st.text_input("Password", type="password")
 
         submitted = st.form_submit_button("🔐 Connect")
@@ -85,9 +79,13 @@ if st.sidebar.button("Log out"):
     st.cache_resource.clear()
     st.rerun()
 
-# --------------------------
+if "viz_df_cache" not in st.session_state:
+    st.session_state.viz_df_cache = None
+
+if "viz_table_selected" not in st.session_state:
+    st.session_state.viz_table_selected = None
+
 # Main application
-# --------------------------
 if "server_engine" in st.session_state:
     server_engine = st.session_state.server_engine
     params = st.session_state.connection_params
@@ -98,6 +96,11 @@ if "server_engine" in st.session_state:
         st.sidebar.header("Database Selection")
         selected_database = st.sidebar.selectbox("Select database", databases)
 
+        if "current_database" in st.session_state and st.session_state.current_database != selected_database:
+            st.session_state.table_info_cache = None
+            st.session_state.viz_df_cache = None
+            st.session_state.current_database = selected_database
+
         if st.sidebar.button("Connect to Database"):
             db_engine = get_database_connection(
                 params["host"], params["port"], params["username"], params["password"], selected_database
@@ -105,6 +108,8 @@ if "server_engine" in st.session_state:
             if db_engine:
                 st.session_state.db_engine = db_engine
                 st.session_state.current_database = selected_database
+                st.session_state.table_info_cache = None  
+                st.session_state.viz_df_cache = None
                 st.sidebar.success(f"✅ Connected to {selected_database}!")
 
         if "db_engine" in st.session_state:
@@ -123,9 +128,7 @@ if "server_engine" in st.session_state:
                     "🧠 Ask in Natural Language"
                 ])
 
-                # --------------------------
                 # Tab 1: Table Explorer
-                # --------------------------
                 with tab1:
                     st.subheader("Table Explorer")
                     table_options = tables_df["table_name"].tolist()
@@ -145,7 +148,7 @@ if "server_engine" in st.session_state:
                             st.metric("Total Rows", row_count)
 
                         with col2:
-                            limit = st.number_input("Limit rows", min_value=10, max_value=1000, value=100)
+                            limit = int(st.number_input("Limit rows", min_value=10, max_value=1000, value=100, key="table_limit"))
                             query = f"SELECT * FROM `{selected_table}` LIMIT {limit}"
                             df = execute_query(db_engine, query)
 
@@ -154,41 +157,41 @@ if "server_engine" in st.session_state:
                                 csv = df.to_csv(index=False)
                                 st.download_button("⬇️ Download CSV", csv, f"{selected_table}.csv", "text/csv")
 
-                # --------------------------
                 # Tab 2: Custom SQL Query
-                # --------------------------
                 with tab2:
                     st.subheader("Custom SQL Query")
                     query = st.text_area("Enter SQL query:", height=200, placeholder="SELECT * FROM your_table LIMIT 100")
-                    limit = st.number_input("Result limit", min_value=10, max_value=10000, value=1000)
+                    limit = int(st.number_input("Limit rows", min_value=10, max_value=1000, value=100, key="custom_query_limit"))
 
-                    if st.button("Run Query"):
+                    if st.button("Run Query", key="custom_sql_run"):
                         df = execute_query(db_engine, query, limit)
                         if not df.empty:
                             st.dataframe(df, use_container_width=True)
 
-                # --------------------------
                 # Tab 3: Visualization
-                # --------------------------
                 with tab3:
                     st.subheader("Quick Visualization")
                     viz_table = st.selectbox("Select a table", tables_df["table_name"].tolist(), key="viz_table")
 
                     if viz_table:
-                        sample_query = f"SELECT * FROM `{viz_table}` LIMIT 1000"
-                        viz_df = execute_query(db_engine, sample_query)
-
-                        if not viz_df.empty:
+                        if ("viz_df_cache" not in st.session_state or
+                            st.session_state.viz_table_selected != viz_table):
+                            sample_query = f"SELECT * FROM `{viz_table}` LIMIT 1000"
+                            st.session_state.viz_df_cache = execute_query(db_engine, sample_query)
+                            st.session_state.viz_table_selected = viz_table
+                        viz_df = st.session_state.viz_df_cache
+                        
+                        if len(viz_df.columns) < 2:
+                            st.warning("Table must have at least 2 columns for visualization.")
+                        else:
                             x_col = st.selectbox("X-axis", viz_df.columns)
                             y_col = st.selectbox("Y-axis", viz_df.columns)
 
-                            if st.button("Generate Chart"):
+                            if st.button("Generate Chart", key="generate_chart"):
                                 fig = px.scatter(viz_df, x=x_col, y=y_col)
                                 st.plotly_chart(fig, use_container_width=True)
 
-                # --------------------------
                 # Tab 4: Database Info
-                # --------------------------
                 with tab4:
                     st.subheader("Database Info")
                     info = []
@@ -203,23 +206,45 @@ if "server_engine" in st.session_state:
                         })
                     st.dataframe(pd.DataFrame(info))
 
-                # --------------------------
                 # Tab 5: Natural Language Query
-                # --------------------------
                 with tab5:
                     st.subheader("Ask in Natural Language")
-                    question = st.text_input("Enter your question")
-                    if st.button("Ask"):
-                        sql_query = handle_nl_query(question, "GROQ", mode="regex")
-                        if not sql_query:
-                            sql_query = handle_nl_query(question, "GROQ", mode="llm")
-                        
-                        if sql_query:
-                            st.code(sql_query, language="sql")
-                            results = execute_query(db_engine, sql_query)
-                            st.dataframe(results)
+
+                    # Provider dropdown
+                    provider_options = ["GROQ"] 
+                    selected_provider = st.selectbox(
+                        "Select LLM provider", 
+                        provider_options, 
+                        index=0, 
+                        key="nlq_provider"
+                    )
+
+                    # Question input
+                    question = st.text_input("Enter your question", key="nlq_question")
+
+                    # Ask button
+                    if st.button("Ask", key="nlq_ask"):
+                        if not question.strip():
+                            st.warning("Please enter a question first.")
                         else:
-                            st.warning("I couldn’t generate a valid SQL query for that question.")
+                            # Generate SQL using the selected provider
+                            with st.spinner("🔄 Generating SQL and fetching results..."):
+                                sql_query = handle_nl_query(question, source=selected_provider)
+
+                                if sql_query:
+                                    st.code(sql_query, language="sql")
+                                    
+                                    # Execute query
+                                    results = execute_query(db_engine, sql_query)
+
+                                    # Display results
+                                    if results is not None and not results.empty:
+                                        st.dataframe(results)
+                                    else:
+                                        st.info("🔍 Query executed successfully but returned no data.")
+
+                                else:
+                                    st.warning("I couldn’t generate a valid SQL query for that question.")
 
     else:
         st.warning("No databases found on this server.")
