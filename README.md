@@ -1,5 +1,7 @@
 # Database Query Explorer
 
+Turn plain English questions into SQL queries and visualizations for MySQL databases.
+
 A **Streamlit-based tool** for exploring **MySQL databases** with support for:
 - Schema browsing
 - Custom SQL queries
@@ -35,8 +37,7 @@ A **Streamlit-based tool** for exploring **MySQL databases** with support for:
 
 # 1) Clone the repo
  ```bash
-git clone https://github.com/Mahir3376/NLQ.git
-cd NLQ
+git clone https://github.com/Mahir3376/natural-language-sql.git
 ```
 # 2) Create and activate a virtual environment
  ```bash
@@ -69,11 +70,11 @@ streamlit run src/app.py
     setx GROQ_API_KEY "your_api_key_here"     # Windows
     ```
 
-  - If no key is set, NLQ features are disabled but everything else works.
+  - NLQ is powered by Groq LLaMA models for SQL generation. If no key is set, you can still use schema browsing, queries, and visualizations.
 
 ---
 
-## Example NLQ Queries
+## Sample Questions You Can Ask
 
 - *"What are the names of hotels in Hyderabad"*
 - *"List all customers planning to go Hyderabad"*
